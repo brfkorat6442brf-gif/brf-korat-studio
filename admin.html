@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการตารางสอน | BRF KORAT STUDIO Admin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ADMIN PIN AUTHENTICATION MODAL -->
+    <div id="pinOverlay" class="pin-overlay">
+        <div class="pin-card">
+            <div class="brand-emblem" style="width:60px; height:60px; margin:0 auto 1rem;">
+                <div class="brand-emblem-inner">
+                    <span class="brf-letters">BRF</span>
+                    <div class="eq-bars">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+            <h2 style="font-size:1.35rem; color:#fff;">🔐 เข้าสู่ระบบจัดการข้อมูล</h2>
+            <p style="font-size:0.86rem; color:var(--text-secondary); margin-top:0.3rem;">
+                BRF KORAT STUDIO (รหัสเริ่มต้นคือ <strong style="color:var(--gold-light);">1234</strong>)
+            </p>
+            <form id="pinLoginForm">
+                <input type="password" id="pinInputField" class="pin-input" placeholder="••••" maxlength="16" autocomplete="current-password" required>
+                <div id="pinErrorMsg" style="color:#fb7185; font-size:0.84rem; margin-bottom:0.8rem; display:none;"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%; padding:0.8rem;">
+                    🔓 ปลดล็อกเข้าสู่หน้าจัดการ (Unlock Admin)
+                </button>
+                <div style="margin-top:1rem;">
+                    <a href="index.html" style="color:var(--text-secondary); font-size:0.84rem; text-decoration:none;">← กลับไปหน้าจอแสดงผลหลัก (TV Display)</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="app-wrapper">
+        <!-- SEPARATED TOP MENU BAR -->
+        <nav class="top-menubar">
+            <div class="menubar-left">
+                <div class="nav-tabs">
+                    <a href="index.html" class="nav-tab">
+                        <span>📺</span> หน้าจอแสดงผลหลัก (Live Display)
+                    </a>
+                    <a href="admin.html" class="nav-tab active">
+                        <span>⚙️</span> จัดการข้อมูลตารางสอน (Admin Panel)
+                    </a>
+                    <a href="index.html" target="_blank" class="nav-tab" title="เปิดหน้าจอแสดงผลทีวีในแท็บใหม่">
+                        <span>↗️</span> เปิดจอแสดงผลแยกหน้าต่าง
+                    </a>
+                </div>
+                <div class="sync-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>เชื่อมต่อฐานข้อมูล Cloudflare KV แบบ Real-time</span>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+                <span id="adminClock" style="font-family:'Outfit',monospace; font-weight:700; color:var(--gold-light);"></span>
+                <button class="btn btn-secondary btn-sm" id="lockAdminBtn">🔒 ล็อกหน้าจอ Admin</button>
+                <button class="btn btn-danger btn-sm" id="resetDefaultBtn">🔄 รีเซ็ตข้อมูลตัวอย่าง</button>
+            </div>
+        </nav>
+
+        <!-- ADMIN SPLIT LAYOUT (SIDEBAR MENU + CONTENT AREA) -->
+        <div class="admin-layout">
+            <aside class="admin-sidebar">
+                <div style="display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0.75rem 1.1rem; border-bottom:1px solid var(--border-subtle); margin-bottom:0.5rem;">
+                    <div class="brand-emblem" style="width:42px; height:42px; border-radius:12px;">
+                        <div class="brand-emblem-inner" style="border-radius:10px;">
+                            <span class="brf-letters" style="font-size:0.9rem;">BRF</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-weight:800; font-size:0.95rem; color:#fff;">BRF KORAT</div>
+                        <div style="font-size:0.74rem; color:var(--text-secondary);">Cloudflare KV Admin</div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section-label">แถบเมนูการจัดการ (Menu)</div>
+                <button class="sidebar-btn active" data-tab="panel-schedules">
+                    <span>📅</span> จัดการตารางสอน (เพิ่ม/ลบ)
+                </button>
+                <button class="sidebar-btn" data-tab="panel-teachers">
+                    <span>👨‍🏫</span> ข้อมูลครูผู้สอน
+                </button>
+                <button class="sidebar-btn" data-tab="panel-rooms">
+                    <span>🚪</span> ข้อมูลห้องเรียน (Studios)
+                </button>
+                <button class="sidebar-btn" data-tab="panel-subjects">
+                    <span>🎵</span> ข้อมูลรายวิชาดนตรี/การแสดง
+                </button>
+                <button class="sidebar-btn" data-tab="panel-backup">
+                    <span>📥</span> สำรองข้อมูล Excel CSV / JSON
+                </button>
+                <button class="sidebar-btn" data-tab="panel-settings">
+                    <span>📢</span> ตั้งค่าสถาบัน & รหัสผ่าน PIN
+                </button>
+            </aside>
+
+            <main class="admin-main">
+                <!-- TAB 1: SCHEDULE CRUD -->
+                <section id="panel-schedules" class="admin-panel active">
+                    <div class="glass-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.1rem; flex-wrap:wrap; gap:0.5rem;">
+                            <div>
+                                <h2 id="formHeading" style="font-size:1.25rem; color:var(--gold-light);">➕ เพิ่มรายการตารางสอนใหม่</h2>
+                                <p style="font-size:0.84rem; color:var(--text-secondary);">รองรับทั้งตารางเรียนประจำสัปดาห์ และตารางเรียนระบุวันที่เฉพาะเจาะจง (เช่น คลาสชดเชย)</p>
+                            </div>
+                            <button type="button" id="cancelEditBtn" class="btn btn-secondary btn-sm" style="display:none;">ยกเลิกการแก้ไข</button>
+                        </div>
+
+                        <form id="scheduleForm">
+                            <input type="hidden" id="editScheduleId" value="">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>วันเรียนประจำสัปดาห์ *</label>
+                                    <select id="fDay" class="form-control" required>
+                                        <option value="0">วันอาทิตย์ (Sunday)</option>
+                                        <option value="1">วันจันทร์ (Monday)</option>
+                                        <option value="2">วันอังคาร (Tuesday)</option>
+                                        <option value="3">วันพุธ (Wednesday)</option>
+                                        <option value="4">วันพฤหัสบดี (Thursday)</option>
+                                        <option value="5">วันศุกร์ (Friday)</option>
+                                        <option value="6">วันเสาร์ (Saturday)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>วันที่เฉพาะเจาะจง (เว้นว่างหากเรียนทุกสัปดาห์)</label>
+                                    <input type="date" id="fSpecificDate" class="form-control" title="ระบุเฉพาะกรณีเป็นคลาสพิเศษหรือคลาสชดเชยรายวัน">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>เวลาเริ่มเรียน *</label>
+                                    <input type="time" id="fStartTime" class="form-control" value="15:00" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>เวลาเลิกเรียน *</label>
+                                    <input type="time" id="fEndTime" class="form-control" value="16:00" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>รายวิชา (Subject) *</label>
+                                    <input type="text" id="fSubject" list="subjectListOptions" class="form-control" placeholder="เช่น เปียโน, ขับร้องสากล, เต้น K-Pop" required>
+                                    <datalist id="subjectListOptions"></datalist>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>หมวดหมู่ไอคอนและสีแสดงผล *</label>
+                                    <select id="fCategory" class="form-control">
+                                        <option value="vocal">🎤 ขับร้อง (Vocal)</option>
+                                        <option value="piano">🎹 เปียโน (Piano)</option>
+                                        <option value="guitar">🎸 กีตาร์ & เบส (Guitar)</option>
+                                        <option value="drums">🥁 กลองชุด (Drums)</option>
+                                        <option value="strings">🎻 เครื่องสาย (Violin/Strings)</option>
+                                        <option value="dance">💃 เต้น (Dance)</option>
+                                        <option value="acting">🎭 การแสดง (Acting & Drama)</option>
+                                        <option value="band">🎺 รวมวงดนตรี (Band Ensemble)</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>ครูผู้สอน (Teacher) *</label>
+                                    <input type="text" id="fTeacher" list="teacherListOptions" class="form-control" placeholder="ชื่อครูผู้สอน" required>
+                                    <datalist id="teacherListOptions"></datalist>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>ชื่อนักเรียน / กลุ่มนักเรียน (Student) *</label>
+                                    <input type="text" id="fStudent" class="form-control" placeholder="เช่น น้องอันดา หรือ คลาส K-Pop 5 คน" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>ห้องเรียน (Studio Room) *</label>
+                                    <input type="text" id="fRoom" list="roomListOptions" class="form-control" placeholder="เลือกหรือพิมพ์ชื่อห้องเรียน" required>
+                                    <datalist id="roomListOptions"></datalist>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>ระดับคลาส (Level / ประเภท)</label>
+                                    <input type="text" id="fLevel" class="form-control" placeholder="เช่น Beginner, Grade 2, Private">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>หมายเหตุเพิ่มเติม (Note)</label>
+                                    <input type="text" id="fNote" class="form-control" placeholder="เช่น คลาสชดเชย, ซ้อมโชว์">
+                                </div>
+                            </div>
+
+                            <div style="margin-top:1.25rem; display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+                                <button type="submit" class="btn btn-primary" id="saveScheduleBtn">
+                                    <span>💾</span> บันทึกตารางสอนขึ้นฐานข้อมูล
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="fillCurrentTimeBtn">
+                                    <span>⚡</span> ตั้งเวลาเป็นชั่วโมงปัจจุบัน (ทดสอบสถานะกำลังเรียน LIVE)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- SCHEDULE TABLE LIST -->
+                    <div class="glass-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+                            <h3>📋 รายการตารางสอนทั้งหมด (<span id="adminTotalCount">0</span> รายการ)</h3>
+                            <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+                                <select id="adminFilterDay" class="filter-select">
+                                    <option value="ALL">ทุกวันในสัปดาห์</option>
+                                    <option value="0">วันอาทิตย์</option>
+                                    <option value="1">วันจันทร์</option>
+                                    <option value="2">วันอังคาร</option>
+                                    <option value="3">วันพุธ</option>
+                                    <option value="4">วันพฤหัสบดี</option>
+                                    <option value="5">วันศุกร์</option>
+                                    <option value="6">วันเสาร์</option>
+                                </select>
+                                <input type="text" id="adminSearchInput" class="filter-select" placeholder="🔍 ค้นหาชื่อครู นักเรียน วิชา...">
+                            </div>
+                        </div>
+
+                        <div class="board-table-wrap">
+                            <table class="board-table">
+                                <thead>
+                                    <tr>
+                                        <th>วัน / วันที่เฉพาะ</th>
+                                        <th>เวลา</th>
+                                        <th>รายวิชา</th>
+                                        <th>ครูผู้สอน</th>
+                                        <th>นักเรียน</th>
+                                        <th>ห้องเรียน</th>
+                                        <th>สถานะ</th>
+                                        <th style="text-align:right;">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminScheduleTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 2: TEACHERS -->
+                <section id="panel-teachers" class="admin-panel">
+                    <div class="glass-box">
+                        <h2>👨‍🏫 จัดการรายชื่อครูผู้สอน (Teachers)</h2>
+                        <p style="font-size:0.86rem; color:var(--text-secondary); margin-top:0.25rem;">รายชื่อครูที่บันทึกไว้จะแสดงเป็นตัวเลือกอัตโนมัติเวลาเพิ่มตารางสอน</p>
+                        <form id="addTeacherForm" style="display:flex; gap:0.75rem; margin-top:1rem; max-width:520px;">
+                            <input type="text" id="newTeacherInput" class="form-control" style="flex:1;" placeholder="เช่น ครูแพทตี้ (Kru Patty)" required>
+                            <button type="submit" class="btn btn-primary">➕ เพิ่มครูผู้สอน</button>
+                        </form>
+                        <div class="tag-list" id="teacherChipsContainer"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 3: ROOMS -->
+                <section id="panel-rooms" class="admin-panel">
+                    <div class="glass-box">
+                        <h2>🚪 จัดการห้องเรียนสตูดิโอ (Studio Rooms)</h2>
+                        <p style="font-size:0.86rem; color:var(--text-secondary); margin-top:0.25rem;">เพิ่มหรือลบห้องซ้อมและห้องเรียนสำหรับแสดงผลแยกคอลัมน์บนหน้าจอหลัก</p>
+                        <form id="addRoomForm" style="display:flex; gap:0.75rem; margin-top:1rem; max-width:520px;">
+                            <input type="text" id="newRoomInput" class="form-control" style="flex:1;" placeholder="เช่น Studio 5 (Vocal VIP)" required>
+                            <button type="submit" class="btn btn-primary">➕ เพิ่มห้องเรียน</button>
+                        </form>
+                        <div class="tag-list" id="roomChipsContainer"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 4: SUBJECTS -->
+                <section id="panel-subjects" class="admin-panel">
+                    <div class="glass-box">
+                        <h2>🎵 จัดการรายวิชาดนตรีและการแสดง (Subjects)</h2>
+                        <p style="font-size:0.86rem; color:var(--text-secondary); margin-top:0.25rem;">เพิ่มรายวิชาที่เปิดสอนในสถาบัน BRF KORAT STUDIO</p>
+                        <form id="addSubjectForm" style="display:flex; gap:0.75rem; margin-top:1rem; flex-wrap:wrap; max-width:720px;">
+                            <input type="text" id="newSubjectName" class="form-control" style="flex:1; min-width:220px;" placeholder="ชื่อรายวิชา เช่น แซกโซโฟน (Saxophone)" required>
+                            <select id="newSubjectCategory" class="form-control">
+                                <option value="vocal">🎤 ขับร้อง (Vocal)</option>
+                                <option value="piano">🎹 เปียโน (Piano)</option>
+                                <option value="guitar">🎸 กีตาร์ & เบส (Guitar)</option>
+                                <option value="drums">🥁 กลองชุด (Drums)</option>
+                                <option value="strings">🎻 เครื่องสาย (Violin)</option>
+                                <option value="dance">💃 เต้น (Dance)</option>
+                                <option value="acting">🎭 การแสดง (Acting)</option>
+                                <option value="band">🎺 รวมวงดนตรี (Band)</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">➕ เพิ่มรายวิชา</button>
+                        </form>
+                        <div class="tag-list" id="subjectChipsContainer"></div>
+                    </div>
+                </section>
+
+                <!-- TAB 5: EXPORT / IMPORT BACKUP -->
+                <section id="panel-backup" class="admin-panel">
+                    <div class="glass-box">
+                        <h2>📥 ส่งออกและนำเข้าข้อมูล (Export / Import Excel CSV & JSON)</h2>
+                        <p style="font-size:0.86rem; color:var(--text-secondary); margin-top:0.3rem;">
+                            ดาวน์โหลดตารางสอนเก็บไว้เป็นไฟล์ Excel (CSV) หรือไฟล์ฐานข้อมูล JSON เต็มรูปแบบ และสามารถอัปโหลดกลับเข้าสู่ระบบได้ตลอดเวลา
+                        </p>
+
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1.25rem; margin-top:1.25rem;">
+                            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:16px; padding:1.25rem;">
+                                <h3 style="font-size:1.05rem; color:var(--gold-light); margin-bottom:0.5rem;">📊 ส่งออกข้อมูล (Export)</h3>
+                                <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:1rem;">
+                                    ไฟล์ CSV รองรับภาษาไทย (UTF-8 BOM) เปิดด้วยโปรแกรม Microsoft Excel หรือ Google Sheets ได้ทันที
+                                </p>
+                                <div style="display:flex; gap:0.65rem; flex-wrap:wrap;">
+                                    <button type="button" class="btn btn-primary" id="exportCsvBtn">📄 ดาวน์โหลดตารางสอน (.CSV)</button>
+                                    <button type="button" class="btn btn-secondary" id="exportJsonBtn">📦 ดาวน์โหลดฐานข้อมูล (.JSON)</button>
+                                </div>
+                            </div>
+
+                            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); border-radius:16px; padding:1.25rem;">
+                                <h3 style="font-size:1.05rem; color:#34d399; margin-bottom:0.5rem;">📤 นำเข้าข้อมูล (Import)</h3>
+                                <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:1rem;">
+                                    เลือกไฟล์ `.json` หรือ `.csv` เพื่อนำเข้าตารางสอนขึ้นไปยัง Cloudflare KV
+                                </p>
+                                <input type="file" id="importFileInput" accept=".json,.csv" class="form-control" style="margin-bottom:0.75rem;">
+                                <button type="button" class="btn btn-primary" id="importFileBtn">🚀 อัปโหลดและนำเข้าข้อมูล</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 6: SETTINGS & ADMIN PIN -->
+                <section id="panel-settings" class="admin-panel">
+                    <div class="glass-box">
+                        <h2>📢 ตั้งค่าชื่อสถาบัน ข้อความวิ่ง และรหัสผ่านผู้ดูแลระบบ (Admin PIN)</h2>
+                        <form id="settingsForm" style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem; max-width:720px;">
+                            <div class="form-group">
+                                <label>ชื่อสถาบันหลักบนหน้าจอ</label>
+                                <input type="text" id="setStudioName" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label>คำโปรย / ชื่อรองสถาบัน</label>
+                                <input type="text" id="setSubtitle" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label>ข้อความประชาสัมพันธ์แถบวิ่งด้านล่างจอ (Marquee Ticker)</label>
+                                <textarea id="setAnnouncement" rows="3" class="form-control" required></textarea>
+                            </div>
+                            <div class="form-group" style="padding-top:0.6rem; border-top:1px solid var(--border-subtle);">
+                                <label>🔐 เปลี่ยนรหัสผ่านเข้าหน้า Admin (Admin PIN) — เว้นว่างไว้หากไม่ต้องการเปลี่ยน</label>
+                                <input type="password" id="setNewAdminPin" class="form-control" placeholder="กรอกรหัส PIN ใหม่ เช่น 8899 (ค่าเริ่มต้นคือ 1234)">
+                            </div>
+                            <div>
+                                <button type="submit" class="btn btn-primary">💾 บันทึกการตั้งค่าทั้งหมด</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div id="toastEl" class="toast-notification">บันทึกข้อมูลและอัปเดตหน้าจอเรียบร้อยแล้ว!</div>
+
+    <script src="shared.js"></script>
+    <script>
+        (function () {
+            const store = window.StudioStore;
+            const pinOverlay = document.getElementById('pinOverlay');
+            const pinLoginForm = document.getElementById('pinLoginForm');
+            const pinInputField = document.getElementById('pinInputField');
+            const pinErrorMsg = document.getElementById('pinErrorMsg');
+
+            // Default form day to current real-world day
+            document.getElementById('fDay').value = String(new Date().getDay());
+
+            // Auto-sync day dropdown if user picks a specific date
+            document.getElementById('fSpecificDate').addEventListener('change', (e) => {
+                if (e.target.value) {
+                    const d = new Date(e.target.value + 'T00:00:00');
+                    if (!isNaN(d.getTime())) {
+                        document.getElementById('fDay').value = String(d.getDay());
+                    }
+                }
+            });
+
+            // Check existing session PIN on load
+            async function checkInitialAuth() {
+                const existingPin = store.getAdminPin();
+                if (existingPin) {
+                    const res = await store.verifyPin(existingPin);
+                    if (res.ok) {
+                        pinOverlay.classList.add('hidden');
+                        return;
+                    }
+                }
+                pinOverlay.classList.remove('hidden');
+                pinInputField.focus();
+            }
+
+            pinLoginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                pinErrorMsg.style.display = 'none';
+                const pinVal = pinInputField.value.trim();
+                const res = await store.verifyPin(pinVal);
+                if (res.ok) {
+                    pinOverlay.classList.add('hidden');
+                    pinInputField.value = '';
+                    showToast('🔓 เข้าสู่ระบบจัดการข้อมูลเรียบร้อย');
+                } else {
+                    pinErrorMsg.textContent = res.message || 'รหัส PIN ไม่ถูกต้อง';
+                    pinErrorMsg.style.display = 'block';
+                }
+            });
+
+            document.getElementById('lockAdminBtn').addEventListener('click', () => {
+                store.clearAdminPin();
+                pinOverlay.classList.remove('hidden');
+                pinInputField.focus();
+            });
+
+            function showToast(msg) {
+                const t = document.getElementById('toastEl');
+                t.textContent = msg;
+                t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 2800);
+            }
+
+            function escapeHtml(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            // Sidebar Tab Navigation
+            document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    const target = btn.getAttribute('data-tab');
+                    document.getElementById(target).classList.add('active');
+                });
+            });
+
+            function renderAllAdmin() {
+                const data = store.data;
+                if (!data) return;
+
+                const subjectOpts = (data.subjects || []).map(s => `<option value="${escapeHtml(s.name)}">`).join('');
+                document.getElementById('subjectListOptions').innerHTML = subjectOpts;
+
+                const teacherOpts = (data.teachers || []).map(t => `<option value="${escapeHtml(t)}">`).join('');
+                document.getElementById('teacherListOptions').innerHTML = teacherOpts;
+
+                const roomOpts = (data.rooms || []).map(r => `<option value="${escapeHtml(r)}">`).join('');
+                document.getElementById('roomListOptions').innerHTML = roomOpts;
+
+                const filterDay = document.getElementById('adminFilterDay').value;
+                const searchQ = (document.getElementById('adminSearchInput').value || '').toLowerCase().trim();
+                const now = new Date();
+
+                let list = (data.schedules || []).slice();
+                list = list.filter(item => {
+                    const matchDay = filterDay === 'ALL' ? true : String(item.day) === String(filterDay);
+                    const textBlob = `${item.subject} ${item.teacher} ${item.student} ${item.room} ${item.note || ''} ${item.specificDate || ''}`.toLowerCase();
+                    const matchQ = !searchQ || textBlob.includes(searchQ);
+                    return matchDay && matchQ;
+                });
+
+                list.sort((a, b) => {
+                    if (Number(a.day) !== Number(b.day)) return Number(a.day) - Number(b.day);
+                    return window.timeToMinutes(a.startTime) - window.timeToMinutes(b.startTime);
+                });
+
+                document.getElementById('adminTotalCount').textContent = list.length;
+
+                const tbody = document.getElementById('adminScheduleTableBody');
+                if (list.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:var(--text-secondary);">ไม่พบข้อมูลตารางสอน</td></tr>`;
+                } else {
+                    tbody.innerHTML = list.map(item => {
+                        const dayMeta = window.THAI_DAYS[Number(item.day) || 0];
+                        const statusObj = window.getScheduleStatus(item, now);
+                        const catKey = window.detectCategory(item.subject, item.category);
+                        const catMeta = window.CATEGORY_META[catKey] || window.CATEGORY_META.vocal;
+                        const dayCell = item.specificDate
+                            ? `<div><span style="color:${dayMeta.color};font-weight:600;">${dayMeta.name}</span><br><span class="special-date-tag">📌 ${escapeHtml(window.formatThaiShortDate(item.specificDate))}</span></div>`
+                            : `<span style="color:${dayMeta.color};font-weight:600;">${dayMeta.name}</span>`;
+
+                        return `
+                            <tr class="row-${statusObj.status}">
+                                <td>${dayCell}</td>
+                                <td style="font-family:'Outfit',sans-serif;font-weight:700;">${escapeHtml(item.startTime)} - ${escapeHtml(item.endTime)}</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:0.45rem;font-weight:600;">
+                                        <span>${catMeta.icon}</span>
+                                        <span>${escapeHtml(item.subject)}</span>
+                                        ${item.level ? `<span class="level-tag">${escapeHtml(item.level)}</span>` : ''}
+                                    </div>
+                                </td>
+                                <td>${escapeHtml(item.teacher)}</td>
+                                <td>${escapeHtml(item.student)}</td>
+                                <td><span class="room-badge">${escapeHtml(item.room)}</span></td>
+                                <td><span class="status-badge ${statusObj.status}">${escapeHtml(statusObj.label)}</span></td>
+                                <td style="text-align:right; white-space:nowrap;">
+                                    <button class="btn btn-secondary btn-sm edit-sch-btn" data-id="${escapeHtml(item.id)}">✏️ แก้ไข</button>
+                                    <button class="btn btn-danger btn-sm del-sch-btn" data-id="${escapeHtml(item.id)}">🗑️ ลบ</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                tbody.querySelectorAll('.edit-sch-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        const found = (store.data.schedules || []).find(s => s.id === id);
+                        if (!found) return;
+                        document.getElementById('editScheduleId').value = found.id;
+                        document.getElementById('fDay').value = String(found.day);
+                        document.getElementById('fSpecificDate').value = found.specificDate || '';
+                        document.getElementById('fStartTime').value = found.startTime;
+                        document.getElementById('fEndTime').value = found.endTime;
+                        document.getElementById('fSubject').value = found.subject;
+                        document.getElementById('fCategory').value = found.category || window.detectCategory(found.subject);
+                        document.getElementById('fTeacher').value = found.teacher;
+                        document.getElementById('fStudent').value = found.student;
+                        document.getElementById('fRoom').value = found.room;
+                        document.getElementById('fLevel').value = found.level || '';
+                        document.getElementById('fNote').value = found.note || '';
+
+                        document.getElementById('formHeading').textContent = '✏️ แก้ไขรายการตารางสอน';
+                        document.getElementById('saveScheduleBtn').innerHTML = '<span>💾</span> บันทึกการแก้ไข';
+                        document.getElementById('cancelEditBtn').style.display = 'inline-flex';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    });
+                });
+
+                tbody.querySelectorAll('.del-sch-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        store.data.schedules = (store.data.schedules || []).filter(s => s.id !== id);
+                        const res = await store.save(store.data);
+                        if (res && res.unauthorized) {
+                            pinOverlay.classList.remove('hidden');
+                            return;
+                        }
+                        showToast('🗑️ ลบตารางสอนเรียบร้อยแล้ว');
+                    });
+                });
+
+                // Render Teachers Chips
+                document.getElementById('teacherChipsContainer').innerHTML = (data.teachers || []).map((t, idx) => `
+                    <span class="item-chip">
+                        <span>👨‍🏫 ${escapeHtml(t)}</span>
+                        <button type="button" class="del-teacher-btn" data-idx="${idx}" title="ลบ">×</button>
+                    </span>
+                `).join('');
+
+                document.querySelectorAll('.del-teacher-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const idx = Number(btn.getAttribute('data-idx'));
+                        store.data.teachers.splice(idx, 1);
+                        await store.save(store.data);
+                        showToast('ลบรายชื่อครูผู้สอนแล้ว');
+                    });
+                });
+
+                // Render Rooms Chips
+                document.getElementById('roomChipsContainer').innerHTML = (data.rooms || []).map((r, idx) => `
+                    <span class="item-chip">
+                        <span>🚪 ${escapeHtml(r)}</span>
+                        <button type="button" class="del-room-btn" data-idx="${idx}" title="ลบ">×</button>
+                    </span>
+                `).join('');
+
+                document.querySelectorAll('.del-room-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const idx = Number(btn.getAttribute('data-idx'));
+                        store.data.rooms.splice(idx, 1);
+                        await store.save(store.data);
+                        showToast('ลบห้องเรียนแล้ว');
+                    });
+                });
+
+                // Render Subjects Chips
+                document.getElementById('subjectChipsContainer').innerHTML = (data.subjects || []).map((s, idx) => {
+                    const catMeta = window.CATEGORY_META[s.category] || window.CATEGORY_META.vocal;
+                    return `
+                        <span class="item-chip">
+                            <span>${catMeta.icon} ${escapeHtml(s.name)}</span>
+                            <button type="button" class="del-subject-btn" data-idx="${idx}" title="ลบ">×</button>
+                        </span>
+                    `;
+                }).join('');
+
+                document.querySelectorAll('.del-subject-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const idx = Number(btn.getAttribute('data-idx'));
+                        store.data.subjects.splice(idx, 1);
+                        await store.save(store.data);
+                        showToast('ลบรายวิชาแล้ว');
+                    });
+                });
+
+                if (data.settings) {
+                    document.getElementById('setStudioName').value = data.settings.studioName || '';
+                    document.getElementById('setSubtitle').value = data.settings.subtitle || '';
+                    document.getElementById('setAnnouncement').value = data.settings.announcement || '';
+                }
+            }
+
+            document.getElementById('fSubject').addEventListener('input', (e) => {
+                const val = e.target.value;
+                const foundSub = (store.data.subjects || []).find(s => s.name === val);
+                if (foundSub && foundSub.category) {
+                    document.getElementById('fCategory').value = foundSub.category;
+                } else {
+                    document.getElementById('fCategory').value = window.detectCategory(val);
+                }
+            });
+
+            document.getElementById('fillCurrentTimeBtn').addEventListener('click', () => {
+                const now = new Date();
+                document.getElementById('fDay').value = String(now.getDay());
+                const startH = String(now.getHours()).padStart(2, '0');
+                const endH = String((now.getHours() + 1) % 24).padStart(2, '0');
+                document.getElementById('fStartTime').value = `${startH}:00`;
+                document.getElementById('fEndTime').value = `${endH}:00`;
+                showToast('⚡ ตั้งค่าวันและเวลาเป็นชั่วโมงปัจจุบันแล้ว');
+            });
+
+            function resetFormState() {
+                document.getElementById('editScheduleId').value = '';
+                document.getElementById('fSpecificDate').value = '';
+                document.getElementById('fSubject').value = '';
+                document.getElementById('fTeacher').value = '';
+                document.getElementById('fStudent').value = '';
+                document.getElementById('fRoom').value = '';
+                document.getElementById('fLevel').value = '';
+                document.getElementById('fNote').value = '';
+                document.getElementById('formHeading').textContent = '➕ เพิ่มรายการตารางสอนใหม่';
+                document.getElementById('saveScheduleBtn').innerHTML = '<span>💾</span> บันทึกตารางสอนขึ้นฐานข้อมูล';
+                document.getElementById('cancelEditBtn').style.display = 'none';
+            }
+
+            document.getElementById('cancelEditBtn').addEventListener('click', resetFormState);
+
+            document.getElementById('scheduleForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const editId = document.getElementById('editScheduleId').value;
+                const specDate = document.getElementById('fSpecificDate').value.trim();
+                let dayVal = Number(document.getElementById('fDay').value);
+                if (specDate) {
+                    const parsed = new Date(specDate + 'T00:00:00');
+                    if (!isNaN(parsed.getTime())) dayVal = parsed.getDay();
+                }
+
+                const entry = {
+                    id: editId || ('sch-' + Date.now()),
+                    day: dayVal,
+                    specificDate: specDate,
+                    startTime: document.getElementById('fStartTime').value,
+                    endTime: document.getElementById('fEndTime').value,
+                    subject: document.getElementById('fSubject').value.trim(),
+                    category: document.getElementById('fCategory').value,
+                    teacher: document.getElementById('fTeacher').value.trim(),
+                    student: document.getElementById('fStudent').value.trim(),
+                    room: document.getElementById('fRoom').value.trim(),
+                    level: document.getElementById('fLevel').value.trim(),
+                    note: document.getElementById('fNote').value.trim()
+                };
+
+                if (entry.room && !store.data.rooms.includes(entry.room)) {
+                    store.data.rooms.push(entry.room);
+                }
+                if (entry.teacher && !store.data.teachers.includes(entry.teacher)) {
+                    store.data.teachers.push(entry.teacher);
+                }
+
+                if (editId) {
+                    const idx = store.data.schedules.findIndex(s => s.id === editId);
+                    if (idx !== -1) store.data.schedules[idx] = entry;
+                } else {
+                    store.data.schedules.push(entry);
+                }
+
+                const res = await store.save(store.data);
+                if (res && res.unauthorized) {
+                    pinOverlay.classList.remove('hidden');
+                    return;
+                }
+                resetFormState();
+                showToast('✅ บันทึกตารางสอนลงฐานข้อมูลเรียบร้อย!');
+            });
+
+            // Add Teacher
+            document.getElementById('addTeacherForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const val = document.getElementById('newTeacherInput').value.trim();
+                if (!val) return;
+                store.data.teachers = store.data.teachers || [];
+                if (!store.data.teachers.includes(val)) {
+                    store.data.teachers.push(val);
+                    await store.save(store.data);
+                }
+                document.getElementById('newTeacherInput').value = '';
+                showToast('เพิ่มรายชื่อครูผู้สอนเรียบร้อย!');
+            });
+
+            // Add Room
+            document.getElementById('addRoomForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const val = document.getElementById('newRoomInput').value.trim();
+                if (!val) return;
+                store.data.rooms = store.data.rooms || [];
+                if (!store.data.rooms.includes(val)) {
+                    store.data.rooms.push(val);
+                    await store.save(store.data);
+                }
+                document.getElementById('newRoomInput').value = '';
+                showToast('เพิ่มห้องเรียนสตูดิโอเรียบร้อย!');
+            });
+
+            // Add Subject
+            document.getElementById('addSubjectForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('newSubjectName').value.trim();
+                const cat = document.getElementById('newSubjectCategory').value;
+                if (!name) return;
+                store.data.subjects = store.data.subjects || [];
+                store.data.subjects.push({
+                    name,
+                    category: cat,
+                    color: (window.CATEGORY_META[cat] || window.CATEGORY_META.vocal).color
+                });
+                await store.save(store.data);
+                document.getElementById('newSubjectName').value = '';
+                showToast('เพิ่มรายวิชาใหม่เรียบร้อย!');
+            });
+
+            // Export CSV (Excel UTF-8 BOM)
+            document.getElementById('exportCsvBtn').addEventListener('click', () => {
+                const schedules = store.data.schedules || [];
+                const headers = ['id', 'day', 'dayName', 'specificDate', 'startTime', 'endTime', 'subject', 'category', 'teacher', 'student', 'room', 'level', 'note'];
+                const csvRows = [headers.join(',')];
+
+                schedules.forEach(s => {
+                    const dayName = (window.THAI_DAYS[Number(s.day)] || {}).name || '';
+                    const vals = [
+                        s.id, s.day, dayName, s.specificDate || '', s.startTime, s.endTime,
+                        s.subject, s.category || '', s.teacher, s.student, s.room, s.level || '', s.note || ''
+                    ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+                    csvRows.push(vals.join(','));
+                });
+
+                const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `BRF_Korat_Schedule_${window.getTodayISO()}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('📄 ดาวน์โหลดไฟล์ตารางสอน .CSV เรียบร้อย');
+            });
+
+            // Export JSON
+            document.getElementById('exportJsonBtn').addEventListener('click', () => {
+                const blob = new Blob([JSON.stringify(store.data, null, 2)], { type: 'application/json;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `BRF_Korat_Backup_${window.getTodayISO()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('📦 ดาวน์โหลดไฟล์ฐานข้อมูล .JSON เรียบร้อย');
+            });
+
+            // Import CSV or JSON
+            function parseCSVLine(line) {
+                const result = [];
+                let cur = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const ch = line[i];
+                    if (ch === '"') {
+                        if (inQuotes && line[i + 1] === '"') {
+                            cur += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (ch === ',' && !inQuotes) {
+                        result.push(cur);
+                        cur = '';
+                    } else {
+                        cur += ch;
+                    }
+                }
+                result.push(cur);
+                return result;
+            }
+
+            document.getElementById('importFileBtn').addEventListener('click', () => {
+                const fileInput = document.getElementById('importFileInput');
+                const file = fileInput.files && fileInput.files[0];
+                if (!file) {
+                    alert('กรุณาเลือกไฟล์ .json หรือ .csv ก่อนกดนำเข้าข้อมูล');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const content = String(evt.target.result || '').replace(/^\uFEFF/, '');
+                        if (file.name.toLowerCase().endsWith('.json')) {
+                            const parsed = JSON.parse(content);
+                            if (parsed.schedules && Array.isArray(parsed.schedules)) {
+                                store.data = parsed;
+                                await store.save(store.data);
+                                showToast('🚀 นำเข้าฐานข้อมูล JSON สำเร็จ!');
+                            } else {
+                                alert('รูปแบบไฟล์ JSON ไม่ถูกต้อง');
+                            }
+                        } else if (file.name.toLowerCase().endsWith('.csv')) {
+                            const lines = content.split(/\r?\n/).filter(l => l.trim() !== '');
+                            if (lines.length < 2) {
+                                alert('ไม่พบข้อมูลในไฟล์ CSV');
+                                return;
+                            }
+                            const headers = parseCSVLine(lines[0]);
+                            const importedSchedules = [];
+                            for (let i = 1; i < lines.length; i++) {
+                                const cols = parseCSVLine(lines[i]);
+                                const rowObj = {};
+                                headers.forEach((h, idx) => {
+                                    rowObj[h.trim()] = (cols[idx] || '').trim();
+                                });
+                                if (rowObj.subject && rowObj.startTime) {
+                                    importedSchedules.push({
+                                        id: rowObj.id || ('sch-' + Date.now() + '-' + i),
+                                        day: Number(rowObj.day || 0),
+                                        specificDate: rowObj.specificDate || '',
+                                        startTime: rowObj.startTime,
+                                        endTime: rowObj.endTime || '10:00',
+                                        subject: rowObj.subject,
+                                        category: rowObj.category || window.detectCategory(rowObj.subject),
+                                        teacher: rowObj.teacher || '-',
+                                        student: rowObj.student || '-',
+                                        room: rowObj.room || 'Studio 1',
+                                        level: rowObj.level || '',
+                                        note: rowObj.note || ''
+                                    });
+                                }
+                            }
+                            store.data.schedules = importedSchedules;
+                            await store.save(store.data);
+                            showToast(`🚀 นำเข้าตารางสอนจาก CSV สำเร็จ (${importedSchedules.length} รายการ)!`);
+                        }
+                        fileInput.value = '';
+                    } catch (err) {
+                        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+                    }
+                };
+                reader.readAsText(file, 'utf-8');
+            });
+
+            // Save Settings + Optional Admin PIN Change
+            document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newPin = document.getElementById('setNewAdminPin').value.trim();
+                store.data.settings = {
+                    ...store.data.settings,
+                    studioName: document.getElementById('setStudioName').value.trim(),
+                    subtitle: document.getElementById('setSubtitle').value.trim(),
+                    announcement: document.getElementById('setAnnouncement').value.trim()
+                };
+                const extra = newPin ? { newAdminPin: newPin } : {};
+                await store.save(store.data, extra);
+                document.getElementById('setNewAdminPin').value = '';
+                showToast('📢 บันทึกการตั้งค่าและอัปเดตฐานข้อมูลเรียบร้อย!');
+            });
+
+            // Reset to Default
+            document.getElementById('resetDefaultBtn').addEventListener('click', async () => {
+                if (confirm('ต้องการรีเซ็ตข้อมูลทั้งหมดกลับเป็นข้อมูลตัวอย่างเริ่มต้นของ BRF KORAT STUDIO หรือไม่?')) {
+                    await store.resetToDefault();
+                    showToast('🔄 รีเซ็ตข้อมูลเริ่มต้นเรียบร้อยแล้ว');
+                }
+            });
+
+            document.getElementById('adminFilterDay').addEventListener('change', renderAllAdmin);
+            document.getElementById('adminSearchInput').addEventListener('input', renderAllAdmin);
+
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('adminClock').textContent = now.toLocaleTimeString('th-TH', { hour12: false });
+            }, 1000);
+
+            store.subscribe(renderAllAdmin);
+            renderAllAdmin();
+            store.fetchFromServer();
+            checkInitialAuth();
+        })();
+    </script>
+</body>
+</html>

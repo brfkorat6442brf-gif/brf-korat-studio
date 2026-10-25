@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BRF KORAT STUDIO | Live Schedule Display สถาบันสอนดนตรีและการแสดง</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- SEPARATED TOP MENU BAR -->
+        <nav class="top-menubar">
+            <div class="menubar-left">
+                <div class="nav-tabs">
+                    <a href="index.html" class="nav-tab active">
+                        <span>📺</span> หน้าจอแสดงผลหลัก (Live Display)
+                    </a>
+                    <a href="admin.html" class="nav-tab">
+                        <span>⚙️</span> จัดการข้อมูลตารางสอน (Admin Panel)
+                    </a>
+                    <a href="admin.html" target="_blank" class="nav-tab" title="เปิดหน้าจัดการข้อมูลในแท็บใหม่เพื่อแก้ไขไปพร้อมกับเปิดจอแสดงผล">
+                        <span>↗️</span> เปิดหน้าจัดการแยกหน้าต่าง
+                    </a>
+                </div>
+                <div class="sync-indicator">
+                    <span class="pulse-dot"></span>
+                    <span id="syncText">Cloudflare KV Auto-Sync ทำงานอัตโนมัติ</span>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+                <button class="btn btn-secondary btn-sm chime-btn" id="toggleChimeBtn" title="เปิด/ปิดเสียงระฆังแจ้งเตือนเมื่อคลาสเรียนใหม่เริ่มต้นขึ้น">
+                    <span id="chimeIcon">🔇</span> <span id="chimeText">เสียงเตือนเริ่มคลาส: ปิด</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" id="toggleKioskBtn" title="ซ่อนแถบเมนูเพื่อแสดงผลเต็มจอทีวี (กด ESC เพื่อออก)">
+                    <span>⛶</span> โหมดเต็มจอทีวี (TV Kiosk)
+                </button>
+            </div>
+        </nav>
+
+        <!-- STUDIO STAGE HERO HEADER -->
+        <header class="studio-header">
+            <div class="brand-identity">
+                <div class="brand-emblem">
+                    <div class="brand-emblem-inner">
+                        <span class="brf-letters">BRF</span>
+                        <div class="eq-bars">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="brand-titles">
+                    <h1 id="studioNameHeading">BRF KORAT STUDIO</h1>
+                    <p id="studioSubtitle">สถาบันสอนดนตรีและการแสดง (Music & Performing Arts Academy)</p>
+                </div>
+            </div>
+
+            <!-- Real-time Status Counters -->
+            <div class="live-stats-bar">
+                <div class="stat-pill live-active">
+                    <span class="stat-icon">🟢</span>
+                    <div class="stat-info">
+                        <div class="stat-val" id="statLiveCount">0</div>
+                        <div class="stat-lbl">กำลังเรียนตอนนี้</div>
+                    </div>
+                </div>
+                <div class="stat-pill upcoming-active">
+                    <span class="stat-icon">⏳</span>
+                    <div class="stat-info">
+                        <div class="stat-val" id="statUpcomingCount">0</div>
+                        <div class="stat-lbl">คลาสถัดไปวันนี้</div>
+                    </div>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-icon">🎼</span>
+                    <div class="stat-info">
+                        <div class="stat-val" id="statTotalToday">0</div>
+                        <div class="stat-lbl">คลาสทั้งหมดของวัน</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Clock & Current Date -->
+            <div class="clock-panel">
+                <div class="digital-time" id="digitalClock">00:00<span class="sec">:00</span></div>
+                <div class="digital-date">
+                    <span class="day-badge-now" id="currentDayBadge">วันนี้</span>
+                    <span id="fullThaiDate">กำลังโหลดวันที่...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- FILTER & VIEW SWITCHER TOOLBAR -->
+        <section class="display-toolbar">
+            <div class="day-selector" id="daySelectorBar">
+                <!-- Populated by JS -->
+            </div>
+
+            <div class="toolbar-right">
+                <select id="roomFilterSelect" class="filter-select">
+                    <option value="ALL">🚪 ทุกห้องเรียน (All Studios)</option>
+                </select>
+
+                <select id="categoryFilterSelect" class="filter-select">
+                    <option value="ALL">🎵 ทุกรายวิชา (All Subjects)</option>
+                    <option value="vocal">🎤 ขับร้อง (Vocal)</option>
+                    <option value="piano">🎹 เปียโน (Piano)</option>
+                    <option value="guitar">🎸 กีตาร์ & เบส (Guitar)</option>
+                    <option value="drums">🥁 กลองชุด (Drums)</option>
+                    <option value="strings">🎻 เครื่องสาย (Violin/Strings)</option>
+                    <option value="dance">💃 เต้น (Dance)</option>
+                    <option value="acting">🎭 การแสดง (Acting)</option>
+                    <option value="band">🎺 รวมวงดนตรี (Band)</option>
+                </select>
+
+                <div class="view-switcher">
+                    <button class="view-btn active" data-view="cards">🗂️ การ์ดแสดงผล</button>
+                    <button class="view-btn" data-view="rooms">🚪 แยกตามห้องเรียน</button>
+                    <button class="view-btn" data-view="board">📋 ตารางรวม</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN SCHEDULE STAGE -->
+        <main class="display-content">
+            <!-- Active Live Spotlight Section (Only shown when classes are currently ON AIR) -->
+            <section id="liveSpotlightSection" class="spotlight-section" style="display:none;">
+                <div class="section-heading">
+                    <div class="section-title">
+                        <span class="badge-live-tag"><span class="pulse-dot"></span> ON AIR NOW</span>
+                        <span>คลาสที่กำลังทำการเรียนการสอนอยู่ในขณะนี้</span>
+                    </div>
+                </div>
+                <div id="liveSpotlightGrid" class="schedule-grid"></div>
+            </section>
+
+            <!-- Main Schedule Section -->
+            <section class="spotlight-section">
+                <div class="section-heading">
+                    <div class="section-title">
+                        <span id="scheduleHeaderTitle">📅 ตารางเรียนประจำวัน</span>
+                    </div>
+                    <div style="font-size:0.84rem; color:var(--text-secondary);" id="scheduleSubCount"></div>
+                </div>
+
+                <!-- Dynamic Container for Cards / Room Columns / Table Board -->
+                <div id="mainScheduleContainer"></div>
+            </section>
+        </main>
+
+        <!-- BOTTOM ANNOUNCEMENT MARQUEE -->
+        <footer class="ticker-bar">
+            <div class="ticker-label">
+                <span>📢</span> BRF KORAT STUDIO
+            </div>
+            <div class="ticker-track">
+                <div class="ticker-text" id="announcementTicker">
+                    ยินดีต้อนรับสู่ BRF KORAT STUDIO สถาบันสอนดนตรีและการแสดง
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <div id="chimeToast" class="toast-notification">🔔 เริ่มคลาสเรียนใหม่แล้ว!</div>
+
+    <script src="shared.js"></script>
+    <script>
+        (function () {
+            const store = window.StudioStore;
+            let selectedDayMode = 'AUTO'; // 'AUTO', 'ALL', or 0..6
+            let selectedRoom = 'ALL';
+            let selectedCategory = 'ALL';
+            let currentViewMode = 'cards'; // 'cards', 'rooms', 'board'
+
+            // Chime Alert State
+            let chimeEnabled = localStorage.getItem('brf_chime_enabled') === 'true';
+            let knownLiveIds = new Set();
+            let initialLoadDone = false;
+
+            const digitalClockEl = document.getElementById('digitalClock');
+            const currentDayBadgeEl = document.getElementById('currentDayBadge');
+            const fullThaiDateEl = document.getElementById('fullThaiDate');
+            const daySelectorBar = document.getElementById('daySelectorBar');
+            const roomFilterSelect = document.getElementById('roomFilterSelect');
+            const categoryFilterSelect = document.getElementById('categoryFilterSelect');
+            const mainScheduleContainer = document.getElementById('mainScheduleContainer');
+            const liveSpotlightSection = document.getElementById('liveSpotlightSection');
+            const liveSpotlightGrid = document.getElementById('liveSpotlightGrid');
+            const scheduleHeaderTitle = document.getElementById('scheduleHeaderTitle');
+            const scheduleSubCount = document.getElementById('scheduleSubCount');
+            const toggleChimeBtn = document.getElementById('toggleChimeBtn');
+            const chimeIcon = document.getElementById('chimeIcon');
+            const chimeText = document.getElementById('chimeText');
+
+            function updateChimeButtonUI() {
+                if (chimeEnabled) {
+                    toggleChimeBtn.classList.add('sound-on');
+                    chimeIcon.textContent = '🔔';
+                    chimeText.textContent = 'เสียงเตือนเริ่มคลาส: เปิด';
+                } else {
+                    toggleChimeBtn.classList.remove('sound-on');
+                    chimeIcon.textContent = '🔇';
+                    chimeText.textContent = 'เสียงเตือนเริ่มคลาส: ปิด';
+                }
+            }
+
+            toggleChimeBtn.addEventListener('click', () => {
+                chimeEnabled = !chimeEnabled;
+                localStorage.setItem('brf_chime_enabled', String(chimeEnabled));
+                updateChimeButtonUI();
+                if (chimeEnabled) {
+                    window.playStudioChime();
+                }
+            });
+
+            function showChimeToast(msg) {
+                const t = document.getElementById('chimeToast');
+                t.textContent = msg;
+                t.classList.add('show');
+                setTimeout(() => t.classList.remove('show'), 4500);
+            }
+
+            function updateClock() {
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2, '0');
+                const mm = String(now.getMinutes()).padStart(2, '0');
+                const ss = String(now.getSeconds()).padStart(2, '0');
+                digitalClockEl.innerHTML = `${hh}:${mm}<span class="sec">:${ss}</span>`;
+
+                const dayObj = window.THAI_DAYS[now.getDay()];
+                currentDayBadgeEl.textContent = dayObj.name;
+                currentDayBadgeEl.style.background = dayObj.color;
+                currentDayBadgeEl.style.color = '#fff';
+
+                const thaiMonths = [
+                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+                ];
+                const buddhistYear = now.getFullYear() + 543;
+                fullThaiDateEl.textContent = `${now.getDate()} ${thaiMonths[now.getMonth()]} พ.ศ. ${buddhistYear}`;
+            }
+
+            function renderDayButtons() {
+                const nowDay = new Date().getDay();
+                const todayInfo = window.THAI_DAYS[nowDay];
+
+                let html = `
+                    <button class="day-chip auto-mode ${selectedDayMode === 'AUTO' ? 'active' : ''}" data-day="AUTO">
+                        <span>⚡</span> วันนี้อัตโนมัติ (${todayInfo.name})
+                    </button>
+                `;
+
+                window.THAI_DAYS.forEach(d => {
+                    const isActive = String(selectedDayMode) === String(d.index);
+                    html += `
+                        <button class="day-chip ${isActive ? 'active' : ''}" data-day="${d.index}">
+                            <span style="width:8px;height:8px;border-radius:50%;background:${d.color};display:inline-block;"></span>
+                            ${d.name}
+                        </button>
+                    `;
+                });
+
+                html += `
+                    <button class="day-chip ${selectedDayMode === 'ALL' ? 'active' : ''}" data-day="ALL">
+                        🗓️ ทั้งสัปดาห์
+                    </button>
+                `;
+
+                daySelectorBar.innerHTML = html;
+
+                daySelectorBar.querySelectorAll('.day-chip').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const val = btn.getAttribute('data-day');
+                        selectedDayMode = (val === 'AUTO' || val === 'ALL') ? val : Number(val);
+                        renderDayButtons();
+                        renderDisplay();
+                    });
+                });
+            }
+
+            function populateRoomFilter() {
+                const rooms = (store.data && store.data.rooms) ? store.data.rooms : [];
+                const currentVal = roomFilterSelect.value;
+                let html = `<option value="ALL">🚪 ทุกห้องเรียน (${rooms.length} ห้อง)</option>`;
+                rooms.forEach(r => {
+                    html += `<option value="${escapeHtml(r)}">🚪 ${escapeHtml(r)}</option>`;
+                });
+                roomFilterSelect.innerHTML = html;
+                if (rooms.includes(currentVal)) {
+                    roomFilterSelect.value = currentVal;
+                }
+            }
+
+            function escapeHtml(str) {
+                return String(str || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function buildCardHtml(item, statusObj, showDayBadge) {
+                const catKey = window.detectCategory(item.subject, item.category);
+                const catMeta = window.CATEGORY_META[catKey] || window.CATEGORY_META.vocal;
+                const dayMeta = window.THAI_DAYS[Number(item.day) || 0];
+
+                let progressSection = '';
+                if (statusObj.status === 'LIVE') {
+                    progressSection = `
+                        <div class="live-progress-wrap">
+                            <div class="live-progress-meta">
+                                <span>⏳ กำลังทำการสอน (${statusObj.progress}%)</span>
+                                <span>เหลือเวลาอีก ${statusObj.minutesLeft} นาที</span>
+                            </div>
+                            <div class="live-progress-track">
+                                <div class="live-progress-fill" style="width:${statusObj.progress}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const specificBadge = item.specificDate
+                    ? `<span class="special-date-tag">📌 เฉพาะวันที่ ${escapeHtml(window.formatThaiShortDate(item.specificDate))}</span>`
+                    : (showDayBadge ? `<span class="level-tag" style="color:${dayMeta.color}">${dayMeta.name}</span>` : '');
+
+                return `
+                    <article class="schedule-card status-${statusObj.status}" style="--card-accent:${catMeta.color}; --card-accent-bg:${catMeta.bg};">
+                        <div class="card-top">
+                            <div class="time-pill">
+                                <span>🕒</span>
+                                <span>${escapeHtml(item.startTime)} - ${escapeHtml(item.endTime)} น.</span>
+                            </div>
+                            <span class="status-badge ${statusObj.status}">
+                                ${statusObj.status === 'LIVE' ? '<span class="pulse-dot"></span>' : ''}
+                                ${escapeHtml(statusObj.label)}
+                            </span>
+                        </div>
+
+                        <div class="subject-row">
+                            <div class="subject-icon-box">${catMeta.icon}</div>
+                            <div class="subject-details">
+                                <h3>${escapeHtml(item.subject)}</h3>
+                                <div class="subject-submeta" style="flex-wrap:wrap;">
+                                    <span>${escapeHtml(catMeta.label)}</span>
+                                    ${item.level ? `<span class="level-tag">${escapeHtml(item.level)}</span>` : ''}
+                                    ${specificBadge}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="participants-grid">
+                            <div class="info-cell">
+                                <span class="lbl">👨‍🏫 ครูผู้สอน (Teacher)</span>
+                                <span class="val" title="${escapeHtml(item.teacher)}">${escapeHtml(item.teacher)}</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="lbl">🎓 นักเรียน (Student)</span>
+                                <span class="val" title="${escapeHtml(item.student)}">${escapeHtml(item.student)}</span>
+                            </div>
+                        </div>
+
+                        ${progressSection}
+
+                        <div class="card-footer">
+                            <span class="room-badge">🚪 ${escapeHtml(item.room)}</span>
+                            ${item.note ? `<span class="note-text">📌 ${escapeHtml(item.note)}</span>` : ''}
+                        </div>
+                    </article>
+                `;
+            }
+
+            function renderDisplay() {
+                const data = store.data;
+                if (!data) return;
+
+                if (data.settings) {
+                    document.getElementById('studioNameHeading').textContent = data.settings.studioName || 'BRF KORAT STUDIO';
+                    document.getElementById('studioSubtitle').textContent = data.settings.subtitle || 'สถาบันสอนดนตรีและการแสดง';
+                    document.getElementById('announcementTicker').textContent = data.settings.announcement || '';
+                }
+
+                const now = new Date();
+                const currentDayIndex = now.getDay();
+
+                const allSchedules = Array.isArray(data.schedules) ? data.schedules.slice() : [];
+                const enriched = allSchedules.map(item => {
+                    const statusObj = window.getScheduleStatus(item, now);
+                    return { item, statusObj };
+                });
+
+                // Check for newly started LIVE classes to trigger audio chime
+                const currentLiveList = enriched.filter(x => x.statusObj.status === 'LIVE');
+                const currentLiveIds = new Set(currentLiveList.map(x => x.item.id));
+                if (initialLoadDone) {
+                    currentLiveList.forEach(x => {
+                        if (!knownLiveIds.has(x.item.id)) {
+                            if (chimeEnabled) {
+                                window.playStudioChime();
+                            }
+                            showChimeToast(`🔔 เริ่มคลาส: ${x.item.subject} (${x.item.room})`);
+                        }
+                    });
+                }
+                knownLiveIds = currentLiveIds;
+                initialLoadDone = true;
+
+                // Calculate top summary stats for TODAY
+                const todayItems = enriched.filter(x => window.isScheduleMatchingDay(x.item, 'AUTO', now));
+                const liveNowItems = todayItems.filter(x => x.statusObj.status === 'LIVE');
+                const upcomingTodayItems = todayItems.filter(x => x.statusObj.status === 'UPCOMING' || x.statusObj.status === 'UPCOMING_SOON');
+
+                document.getElementById('statLiveCount').textContent = liveNowItems.length;
+                document.getElementById('statUpcomingCount').textContent = upcomingTodayItems.length;
+                document.getElementById('statTotalToday').textContent = todayItems.length;
+
+                // Filter by Day, Room, Category
+                const filtered = enriched.filter(({ item }) => {
+                    const matchDay = window.isScheduleMatchingDay(item, selectedDayMode, now);
+                    const matchRoom = (selectedRoom === 'ALL') ? true : item.room === selectedRoom;
+                    const catKey = window.detectCategory(item.subject, item.category);
+                    const matchCategory = (selectedCategory === 'ALL') ? true : catKey === selectedCategory;
+                    return matchDay && matchRoom && matchCategory;
+                });
+
+                filtered.sort((a, b) => {
+                    if (selectedDayMode === 'ALL' && Number(a.item.day) !== Number(b.item.day)) {
+                        return Number(a.item.day) - Number(b.item.day);
+                    }
+                    return window.timeToMinutes(a.item.startTime) - window.timeToMinutes(b.item.startTime);
+                });
+
+                if (selectedDayMode === 'AUTO') {
+                    const dName = window.THAI_DAYS[currentDayIndex].name;
+                    scheduleHeaderTitle.innerHTML = `📅 ตารางเรียนวันนี้ (${dName}) — อัปเดตสถานะตามเวลาจริง`;
+                } else if (selectedDayMode === 'ALL') {
+                    scheduleHeaderTitle.innerHTML = `🗓️ ตารางเรียนรวมตลอดสัปดาห์ (All Week Schedule)`;
+                } else {
+                    const dName = window.THAI_DAYS[Number(selectedDayMode)].name;
+                    scheduleHeaderTitle.innerHTML = `📅 ตารางเรียนประจำ${dName}`;
+                }
+                scheduleSubCount.textContent = `แสดงผลทั้งหมด ${filtered.length} คลาสเรียน`;
+
+                const filteredLive = filtered.filter(x => x.statusObj.status === 'LIVE');
+                if (filteredLive.length > 0 && currentViewMode === 'cards') {
+                    liveSpotlightSection.style.display = 'grid';
+                    liveSpotlightGrid.innerHTML = filteredLive
+                        .map(x => buildCardHtml(x.item, x.statusObj, selectedDayMode === 'ALL'))
+                        .join('');
+                } else {
+                    liveSpotlightSection.style.display = 'none';
+                }
+
+                if (filtered.length === 0) {
+                    mainScheduleContainer.innerHTML = `
+                        <div class="empty-state">
+                            <div style="font-size:2.4rem; margin-bottom:0.5rem;">🎹</div>
+                            <h3>ไม่มีรายการตารางสอนในหมวดหมู่หรือวันที่เลือก</h3>
+                            <p style="margin-top:0.35rem;">สามารถเพิ่มตารางสอนใหม่ได้ที่เมนู "จัดการข้อมูลตารางสอน (Admin Panel)" ด้านบน</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (currentViewMode === 'cards') {
+                    mainScheduleContainer.innerHTML = `
+                        <div class="schedule-grid">
+                            ${filtered.map(x => buildCardHtml(x.item, x.statusObj, selectedDayMode === 'ALL')).join('')}
+                        </div>
+                    `;
+                } else if (currentViewMode === 'rooms') {
+                    const roomsList = selectedRoom === 'ALL' ? (data.rooms || []) : [selectedRoom];
+                    let colsHtml = '<div class="room-columns-grid">';
+                    roomsList.forEach(roomName => {
+                        const roomClasses = filtered.filter(x => x.item.room === roomName);
+                        colsHtml += `
+                            <div class="room-column">
+                                <div class="room-col-header">
+                                    <h3>🚪 ${escapeHtml(roomName)}</h3>
+                                    <span class="level-tag">${roomClasses.length} คลาส</span>
+                                </div>
+                                <div class="room-col-body">
+                                    ${roomClasses.length > 0
+                                        ? roomClasses.map(x => buildCardHtml(x.item, x.statusObj, selectedDayMode === 'ALL')).join('')
+                                        : '<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:0.85rem;">ว่าง / ไม่มีคลาสเรียน</div>'
+                                    }
+                                </div>
+                            </div>
+                        `;
+                    });
+                    colsHtml += '</div>';
+                    mainScheduleContainer.innerHTML = colsHtml;
+                } else if (currentViewMode === 'board') {
+                    let rowsHtml = filtered.map(({ item, statusObj }) => {
+                        const dayMeta = window.THAI_DAYS[Number(item.day) || 0];
+                        const catKey = window.detectCategory(item.subject, item.category);
+                        const catMeta = window.CATEGORY_META[catKey] || window.CATEGORY_META.vocal;
+                        const dayDisplay = item.specificDate
+                            ? `<span class="special-date-tag">📌 ${escapeHtml(window.formatThaiShortDate(item.specificDate))}</span>`
+                            : `<span style="color:${dayMeta.color};font-weight:600;">${dayMeta.name}</span>`;
+                        return `
+                            <tr class="row-${statusObj.status}">
+                                <td>${dayDisplay}</td>
+                                <td style="font-family:'Outfit',sans-serif;font-weight:700;font-size:1rem;">
+                                    ${escapeHtml(item.startTime)} - ${escapeHtml(item.endTime)} น.
+                                </td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+                                        <span>${catMeta.icon}</span>
+                                        <span>${escapeHtml(item.subject)}</span>
+                                        ${item.level ? `<span class="level-tag">${escapeHtml(item.level)}</span>` : ''}
+                                    </div>
+                                </td>
+                                <td>👨‍🏫 ${escapeHtml(item.teacher)}</td>
+                                <td>🎓 ${escapeHtml(item.student)}</td>
+                                <td><span class="room-badge">🚪 ${escapeHtml(item.room)}</span></td>
+                                <td><span class="status-badge ${statusObj.status}">${escapeHtml(statusObj.label)}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+
+                    mainScheduleContainer.innerHTML = `
+                        <div class="board-table-wrap">
+                            <table class="board-table">
+                                <thead>
+                                    <tr>
+                                        <th>วัน / วันที่เฉพาะ</th>
+                                        <th>เวลาเรียน</th>
+                                        <th>รายวิชา / ระดับ</th>
+                                        <th>ครูผู้สอน</th>
+                                        <th>นักเรียน</th>
+                                        <th>ห้องเรียน</th>
+                                        <th>สถานะปัจจุบัน</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rowsHtml}</tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            }
+
+            roomFilterSelect.addEventListener('change', () => {
+                selectedRoom = roomFilterSelect.value;
+                renderDisplay();
+            });
+
+            categoryFilterSelect.addEventListener('change', () => {
+                selectedCategory = categoryFilterSelect.value;
+                renderDisplay();
+            });
+
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentViewMode = btn.getAttribute('data-view');
+                    renderDisplay();
+                });
+            });
+
+            document.getElementById('toggleKioskBtn').addEventListener('click', () => {
+                document.body.classList.toggle('kiosk-fullscreen');
+                if (document.documentElement.requestFullscreen && document.body.classList.contains('kiosk-fullscreen')) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    document.body.classList.remove('kiosk-fullscreen');
+                }
+            });
+
+            store.subscribe(() => {
+                populateRoomFilter();
+                renderDayButtons();
+                renderDisplay();
+            });
+
+            updateChimeButtonUI();
+            updateClock();
+            populateRoomFilter();
+            renderDayButtons();
+            renderDisplay();
+            store.fetchFromServer();
+
+            setInterval(updateClock, 1000);
+            setInterval(renderDisplay, 10000);
+            setInterval(() => store.fetchFromServer(), 4000);
+        })();
+    </script>
+</body>
+</html>
