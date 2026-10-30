@@ -1,0 +1,9 @@
+worker.js
+server.py
+data.json
+wrangler.toml
+package.json
+CLOUDFLARE_DEPLOY.md
+functions/
+.git/
+.gitignore
